@@ -297,14 +297,12 @@ body.noclaude .ln { cursor: default; }
           <button class="item" data-close id="seriesAdd" title="好きな場所のフォルダを会議名として登録する">フォルダを登録…</button>
           <button class="item" data-close id="seriesOpen">フォルダを開く</button>
           <button class="item" data-close id="shotsOpen">この回のスクリーンショットを開く</button>
-          <hr>
-          <button class="item" data-close id="clearBtn" title="画面を空にして、次の開始を新しい会議にする（記録は消さない）">画面をクリア</button>
         </div>
       </div>
     </div>
     <div class="row">
       <select id="meetings"></select>
-      <button class="btn" id="newBtn">＋ 新しい回</button>
+      <button class="btn primary" id="newBtn" title="画面を空にして、新しい回を始めます。これまでの回は消えず、左の一覧から開けます">＋ 新規作成</button>
     </div>
     <input class="field" id="title" placeholder="この回の題名（例: 第3回 システム更新の打合せ）">
   </section>
@@ -769,8 +767,15 @@ function fillMeetings(list, selId) {
   $("meetings").value = selId || "";
 }
 $("meetings").onchange = async () => { if (recording) return; const id = $("meetings").value; showMeeting(id ? await api("open", { id }) : null); if (!id) await api("clear"); };
-$("newBtn").onclick = async () => { if (recording) return; const p = await api("new"); await refreshList(p.id); showMeeting(p); };
-$("clearBtn").onclick = async () => { if (recording) { status("記録中はクリアできません。先に停止してください"); return; } await api("clear"); soundPending = null; $("meetings").value = ""; showMeeting(null); status("クリアしました。次に開始すると新しい会議になります（これまでの記録は一覧から開けます）"); };
+$("newBtn").onclick = async () => {
+  if (recording) return;
+  // まだ何も入っていない回を開いているなら、空の回を増やさない
+  if (cur && !cur.lines.length && !cur.chats.length && !cur.docs.length && !cur.title && !cur.has_audio && !cur.sound) { syncSound(); status("新しい回を開いています。● で記録を始められます"); return; }
+  const p = await api("new");
+  if (!p) return;
+  await refreshList(p.id); showMeeting(p);
+  status("新しい回を始めました。これまでの回は一覧から開けます");
+};
 $("title").addEventListener("change", async () => { await api("title", { title: $("title").value }); if (cur) { cur.title = $("title").value; await refreshList(cur.id); } });
 async function refreshList(selId) { S = await api("state"); fillMeetings(S.meetings, selId); }
 
@@ -784,7 +789,7 @@ function setRecording(on) {
   // 記録中はボタン・文字・音量の線を橙にして、記録していることが一目で分かるようにする
   $("rec").classList.toggle("recording", on); $("recSub").classList.toggle("recording", on);
   document.querySelector(".meter").classList.toggle("recording", on);
-  ["series", "seriesNew", "seriesAdd", "meetings", "newBtn", "clearBtn", "mic", "sound", "chooseData"].forEach((id) => $(id).disabled = on);
+  ["series", "seriesNew", "seriesAdd", "meetings", "newBtn", "mic", "sound", "chooseData"].forEach((id) => $(id).disabled = on);
   if (!on) $("mic").disabled = $("sound").value === "pc";
   if (!on) $("meter").style.width = "0";
   renderPlayer();

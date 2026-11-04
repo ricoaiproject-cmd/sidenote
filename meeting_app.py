@@ -70,6 +70,20 @@ def find_browser():
     return (edge, "edge") if edge else (None, "")
 
 
+def tag_window(hwnd):
+    """窓に「これは Sidenote だ」という情報を付ける。無いと、タスクバーにピン留めしたときに
+    Windows が Chrome（または Edge）として覚え、アイコンも起動先もそちらになってしまう"""
+    from win32com.propsys import propsys, pscon
+    pythonw = Path(sys.executable).with_name("pythonw.exe")
+    store = propsys.SHGetPropertyStoreForWindow(hwnd, propsys.IID_IPropertyStore)
+    for key, value in ((pscon.PKEY_AppUserModel_ID, "RicoAiLab.Sidenote"),
+                       (pscon.PKEY_AppUserModel_RelaunchCommand, f'"{pythonw}" "{HERE / "meeting_app.py"}"'),
+                       (pscon.PKEY_AppUserModel_RelaunchDisplayNameResource, "Sidenote"),
+                       (pscon.PKEY_AppUserModel_RelaunchIconResource, f"{ICON_FILE},0")):
+        store.SetValue(key, propsys.PROPVARIANTType(value))
+    store.Commit()
+
+
 def pick_files(folder=False, title="Sidenote の保存先を選ぶ"):
     """ファイル（またはフォルダ）を選ぶ画面を、別の小さな Python で出して結果を受け取る"""
     code = ("import tkinter as tk, tkinter.filedialog as fd, json\n"
@@ -142,6 +156,28 @@ class Hub:
         self.series = p if p.is_dir() else mn.DATA
         threading.Thread(target=self._pump, daemon=True).start()
         threading.Thread(target=self._timer, daemon=True).start()
+        if not os.environ.get("MEETING_NOTES_NO_WINDOW"):
+            threading.Thread(target=self._tag_windows, daemon=True).start()
+
+    def _tag_windows(self):
+        """開いた Sidenote の窓に、ピン留めのための情報を付ける。窓はブラウザが作るので、見張って見つける。
+        付けられなくても、ピン留めのアイコンが変わるだけなので、ほかの動きは止めない"""
+        tagged = set()
+        try:
+            import pythoncom
+            import screenshot
+            pythoncom.CoInitialize()
+        except Exception:
+            return
+        while True:
+            time.sleep(1)
+            try:
+                for h in screenshot.sidenote_windows():
+                    if h not in tagged:
+                        tag_window(h)
+                        tagged.add(h)
+            except Exception:
+                pass
 
     def emit(self, kind, data=None):
         with self.clients_lock:
