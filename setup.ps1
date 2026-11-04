@@ -99,8 +99,9 @@ Write-Host "使う Python: $(& $py --version)"
 
 # 2. Python の部品
 Step 2 "Python の部品（1〜3分）"
-& $py -m pip install --upgrade pip --quiet
-& $py -m pip install -r requirements.txt --quiet
+# Sidenote は Python を場所で直接呼ぶので、Scripts が PATH に無くても困らない。不安にさせる警告を出さない
+& $py -m pip install --upgrade pip --quiet --no-warn-script-location
+& $py -m pip install -r requirements.txt --quiet --no-warn-script-location
 if ($LASTEXITCODE -ne 0) { throw "Python の部品を入れられませんでした" }
 
 # 3. speech.cpp とモデル

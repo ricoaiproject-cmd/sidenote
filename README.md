@@ -55,7 +55,10 @@ A Windows side panel that transcribes meetings on your PC and lets you ask AI ab
 
 ## 入れ方
 
-1. このページの「Code」→「Download ZIP」でダウンロードします（`git clone` でもかまいません）。
+1. このページの右上にある緑の「Code」を押し、いちばん下の「Download ZIP」でダウンロードします（`git clone` でもかまいません）。
+
+   <img src="docs/download.png" alt="緑の Code ボタンを押すと開く窓の、いちばん下にある Download ZIP を赤い枠で囲んだ画面" width="560">
+
 2. ダウンロードした ZIP を右クリック →「すべて展開」で、好きな場所に展開します。**ZIP の中のまま実行すると失敗します。**
 3. 展開したフォルダの **`setup.bat` をダブルクリック**します。5〜15 分ほどかかります。
    - 「Windows によって PC が保護されました」という青い画面が出たら、**「詳細情報」→「実行」**を押してください。
@@ -254,7 +257,7 @@ engram（AI の記憶を残す道具）を使っている人は、「engramへ�
 | `make_icons.py` | アイコンを作り直すとき用（Pillow が必要） |
 | `install_shortcuts.py` | スタートメニューとスタートアップに登録する |
 | `setup.bat`・`setup.ps1` | セットアップ（必要なものをまとめて入れる） |
-| `docs\screenshot.png` | この説明書の写真（架空の会議） |
+| `docs\screenshot.png`・`docs\download.png` | この説明書の写真 |
 
 ## ライセンス
 

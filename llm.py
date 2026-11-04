@@ -272,14 +272,21 @@ def _anthropic_client(p, timeout):
 
 
 def _anthropic_error(anthropic, e):
-    if isinstance(e, anthropic.AuthenticationError) or isinstance(e, anthropic.PermissionDeniedError):
-        return "API キーが正しくないか、このモデルを使う権限がありません"
+    # 原因が違うので分けて案内する。Anthropic の説明文にキーの中身は入らない
+    detail = f"（Anthropic の説明: {str(getattr(e, 'message', ''))[:200]}）" if getattr(e, "message", "") else ""
+    if isinstance(e, anthropic.AuthenticationError):
+        return ("API キーが受け付けられませんでした（401）。Claude Console で作った、「sk-ant-api」で始まるキーか確かめて、"
+                "貼り直してください。Claude の Pro や Max のログインとは別のものです" + detail)
+    if isinstance(e, anthropic.PermissionDeniedError):
+        return "API キーは届きましたが、この操作の権限がありません（403）。Claude Console で、キーの組織とワークスペースの設定を確かめてください" + detail
     if isinstance(e, anthropic.NotFoundError):
-        return "モデルが見つかりません。設定でモデルを選び直してください"
+        return "モデルが見つかりません。設定でモデルを選び直してください" + detail
+    if getattr(e, "status_code", 0) == 402:
+        return "API の残高が足りません。Claude Console で支払いの設定を確かめてください" + detail
     if isinstance(e, anthropic.RateLimitError):
         return "利用上限か料金の枠に達しました。しばらく待つか、契約を確かめてください"
     if isinstance(e, anthropic.APIStatusError):
-        return f"Claude API がエラーを返しました（{e.status_code}）"
+        return f"Claude API がエラーを返しました（{e.status_code}）" + detail
     return "Claude API に接続できません"
 
 
