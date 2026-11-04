@@ -28,7 +28,7 @@ GW_HWNDNEXT, GWL_EXSTYLE, WS_EX_TOOLWINDOW = 2, -20, 0x00000080
 OFFSCREEN = -32000
 REPAINT_WAIT = 0.15  # 窓をどけたあと、後ろの窓が描き直されるのを待つ秒数
 PER_MONITOR_V2 = ctypes.c_void_p(-4)
-# InPrivate で開くと題名が「Sidenote - [InPrivate]」になる。同じ名前のフォルダの窓（エクスプローラー）は動かさない
+# Edge の InPrivate で開くと題名が「Sidenote - [InPrivate]」になる。同じ名前のフォルダの窓（エクスプローラー）は動かさない
 TITLE = re.compile(r"^Sidenote( - .*InPrivate.*)?$")
 NOT_CONTENT = {"Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd"}
 
@@ -50,7 +50,7 @@ def _class(hwnd):
 
 
 def sidenote_windows():
-    """画面に出ている Sidenote の窓（Edge のアプリの窓）を返す"""
+    """画面に出ている Sidenote の窓（Chrome か Edge のアプリの窓）を返す"""
     found = []
 
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)

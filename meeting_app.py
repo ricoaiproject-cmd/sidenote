@@ -1,6 +1,6 @@
 """Sidenote — 画面との窓口（このPCの中だけで通じるサーバー）と起動の入口。
 
-画面は ui.html（HTML）で、Edge の「アプリとして開く」機能（--app）で表示する。アドレス欄やタブの無い窓になる。
+画面は ui.html（HTML）で、Chrome（無ければ Edge）の「アプリとして開く」機能（--app）で表示する。アドレス欄やタブの無い窓になる。
 Python は 127.0.0.1 で待ち受け、画面からの操作（開始・停止・質問など）を受け、出来事（発言・残り時間・答えなど）を
 流し続ける（Server-Sent Events）。録音・文字起こし・Claude・engram（選べる機能）の中身は meeting_notes.py にある。
 他のアプリやウェブページから勝手に操作されないよう、起動のたびに作る合言葉（token）が無い要求は断る。
@@ -37,28 +37,37 @@ UI_HTML = UI_FILE.read_text(encoding="utf-8")
 STARTED = time.time()
 ICON_FILE = HERE / "icon.ico"
 STATE_FILE = mn.SETTINGS.parent / "server.json"
-EDGE_PROFILE = Path(os.path.expandvars(r"%LOCALAPPDATA%\Sidenote\edge"))
+PROFILE_ROOT = Path(os.path.expandvars(r"%LOCALAPPDATA%\Sidenote"))  # いつものブラウザとは別の、Sidenote 専用の設定フォルダを置く場所
 NO_WINDOW = mn.NO_WINDOW
 
 
 LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # このパソコンの中の通信は、職場のプロキシを通さない
 
 
-def find_edge():
-    """Edge の場所を探す。パソコンによって入っている場所が違う。見つからなければ None"""
-    candidates = [Path(os.environ.get(v, "")) / "Microsoft" / "Edge" / "Application" / "msedge.exe"
-                  for v in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA") if os.environ.get(v)]
+def _find_exe(folder, exe):
+    """ブラウザの場所を探す。パソコンによって入っている場所が違う。見つからなければ None"""
+    candidates = [Path(os.environ.get(v, "")) / folder / "Application" / exe
+                  for v in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA") if os.environ.get(v)]
     try:
         import winreg
         for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
             try:
-                with winreg.OpenKey(root, r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe") as k:
+                with winreg.OpenKey(root, rf"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\{exe}") as k:
                     candidates.append(Path(winreg.QueryValue(k, None)))
             except OSError:
                 pass
     except ImportError:
         pass
     return next((str(p) for p in candidates if p.is_file()), None)
+
+
+def find_browser():
+    """画面を出すブラウザを選ぶ。Chrome があれば Chrome、無ければ Edge。返り値は (場所, 名前)。どちらも無ければ (None, "")"""
+    chrome = _find_exe(Path("Google") / "Chrome", "chrome.exe")
+    if chrome:
+        return chrome, "chrome"
+    edge = _find_exe(Path("Microsoft") / "Edge", "msedge.exe")
+    return (edge, "edge") if edge else (None, "")
 
 
 def pick_files(folder=False, title="Sidenote の保存先を選ぶ"):
@@ -972,7 +981,7 @@ def set_topmost(on):
 
 
 def open_window(url):
-    """Edge の「アプリとして開く」で、画面の右端に縦長の窓を出す"""
+    """Chrome（無ければ Edge）の「アプリとして開く」で、画面の右端に縦長の窓を出す"""
     import ctypes
     from ctypes import wintypes
     rect = wintypes.RECT()
@@ -981,16 +990,18 @@ def open_window(url):
     w = 480
     h = int((rect.bottom - rect.top) / scale)
     x = int(rect.right / scale) - w
-    # InPrivate で開く。専用の設定フォルダを普通に使うと、Windows のアカウントで Edge が自動でサインインし、
-    # 同期の案内が窓にかぶさった（実測）。InPrivate ならサインインも履歴も残らない。
-    # Sidenote の設定は Python 側（%APPDATA%\Sidenote\settings.json）に持つので、Edge に何も残らなくてよい
-    edge = find_edge()
-    if not edge:  # Edge を消しているパソコン。窓の形は崩れるが、いつものブラウザで開ける
+    # Sidenote の設定は Python 側（%APPDATA%\Sidenote\settings.json）に持つので、ブラウザには何も残らなくてよい
+    exe, name = find_browser()
+    if not exe:  # どちらも無いパソコン。窓の形は崩れるが、いつものブラウザで開ける
         webbrowser.open(url)
         return
-    EDGE_PROFILE.mkdir(parents=True, exist_ok=True)
-    subprocess.Popen([edge, "--inprivate", f"--app={url}", f"--window-size={w},{h}", f"--window-position={x},0",
-                      f"--user-data-dir={EDGE_PROFILE}", "--no-first-run", "--no-default-browser-check",
+    profile = PROFILE_ROOT / name  # いつものブラウザとは別の設定で開く。ログインや拡張機能に触らない
+    profile.mkdir(parents=True, exist_ok=True)
+    # Edge だけ InPrivate で開く。専用の設定フォルダを普通に使うと、Windows のアカウントで自動でサインインし、
+    # 同期の案内が窓にかぶさった（実測）
+    private = ["--inprivate"] if name == "edge" else []
+    subprocess.Popen([exe, *private, f"--app={url}", f"--window-size={w},{h}", f"--window-position={x},0",
+                      f"--user-data-dir={profile}", "--no-first-run", "--no-default-browser-check",
                       "--disable-sync", "--disable-features=Translate"], creationflags=NO_WINDOW)
 
 
