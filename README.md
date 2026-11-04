@@ -1,5 +1,9 @@
 # Sidenote
 
+A Windows side panel that transcribes meetings on your PC and lets you ask AI about them. (Documentation is in Japanese.)
+
+<img src="docs/screenshot.png" alt="画面の右端に出る Sidenote の窓。架空の会議の文字起こしと、AI の答えが並んでいる" width="360">
+
 対面の会議や Web 会議を聞きながら文字にして、画面の右端に出す Windows 用の道具です。
 会議の途中でも「ここまでを要約して」「決まったことは？」と AI に聞けます。AI は Claude Code、API キー（Claude・OpenAI・Gemini など）、パソコンの中で動くローカル LLM から選べます。
 
@@ -171,6 +175,8 @@
 
 **Claude Code のときだけ使える機能があります。** Web 検索、コネクタ、画像の資料を読むことの3つです。ほかの接続先では、文字にできる資料だけを読みます。
 
+コネクタの道具の名前は、環境によって違うことがあります。コネクタが使えないときは、使う道具の名前の一覧を `settings.json` の `"connector_tools"` に書いてください。読むだけの道具に限ってください（ここに書いた道具は、確認なしに動きます）。
+
 **ローカル LLM について**
 
 - Ollama の場合は、[Ollama](https://ollama.com/) を入れ、`ollama pull <モデル名>` でモデルを入れておくと、一覧に出ます。LM Studio の場合は、ローカルサーバーを起動しておきます。
@@ -248,6 +254,7 @@ engram（AI の記憶を残す道具）を使っている人は、「engramへ�
 | `make_icons.py` | アイコンを作り直すとき用（Pillow が必要） |
 | `install_shortcuts.py` | スタートメニューとスタートアップに登録する |
 | `setup.bat`・`setup.ps1` | セットアップ（必要なものをまとめて入れる） |
+| `docs\screenshot.png` | この説明書の写真（架空の会議） |
 
 ## ライセンス
 
