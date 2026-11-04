@@ -1,0 +1,11 @@
+# 通知領域のアイコンとショートカットの作成（Windows）
+pywin32
+# 添付した資料の中身を文字にする（PDF は pdfminer.six、Word・Excel・PowerPoint は markitdown。どれも MIT）
+markitdown[pdf,docx,pptx,xlsx,xls]
+# Web 会議の相手の声など、パソコンから出ている音を拾う（Windows の WASAPI ループバック）
+PyAudioWPatch
+numpy
+# 接続先に「Claude API（API キー）」を選んだときに使う
+anthropic
+# スクリーンショット（screenshot.py）と、アイコンを作り直すとき（make_icons.py）
+Pillow

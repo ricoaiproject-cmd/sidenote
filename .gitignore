@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 会議の記録（保存先をこのフォルダの中にした場合に、誤って入れないように）
+*.wav
+*.tmp
+transcript.jsonl
+transcript_clean.jsonl
+chat.jsonl
+meta.json
+meta.broken.*.json
+sidenote.json
+Sidenote.md
+会議メモ.md
+Claudeとの会話_*.md
+AIとの会話_*.md
+_source.*
+資料/
+スクショ/
+
+# 設定・個人の環境
+settings.json
+server.json
+.claude/
+*.log
+
+# アイコンの確認用の画像（make_icons.py が作る）
+*_preview.png
+*_16px.png
+*_32px.png
+
+# 古い版
+meeting_notes_tk版_*.py

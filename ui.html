@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sidenote</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+/* 色はすべてここで決める。記録中は --rec（落ち着いた橙）で、記録していることが一目で分かるようにする */
+:root {
+  --accent: #4a6278; --accent-hover: #3d5266; --accent-soft: rgba(74, 98, 120, .14);
+  --rec: #c4772f; --rec-hover: #a9661f;
+  --bg: #f4f5f7; --card: #ffffff; --line: #e3e6ea; --text: #1d232a; --dim: #6b7480; --faint: #9aa2ab;
+  --field: #f0f2f5; --bubble-q: #e8eef4; --bubble-a: #ffffff; --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
+  --s0: #2f6fbd; --s1: #b5651d; --s2: #2e8b57; --s3: #9b4f96; --s4: #8a7a1a; --s5: #2a8a8a;
+}
+:root[data-theme="dark"] {
+  --accent: #7f9bb4; --accent-hover: #93adc4; --accent-soft: rgba(127, 155, 180, .16);
+  --bg: #16191d; --card: #1f2328; --line: #2e343b; --text: #e6e9ec; --dim: #9aa3ad; --faint: #6c757f;
+  --field: #2a2f35; --bubble-q: #2b3540; --bubble-a: #252a30; --shadow: none;
+  --s0: #7fb3ff; --s1: #ffb36b; --s2: #8fdc8f; --s3: #e59ad6; --s4: #f2d36b; --s5: #7fe0e0;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --accent: #7f9bb4; --accent-hover: #93adc4; --accent-soft: rgba(127, 155, 180, .16);
+    --bg: #16191d; --card: #1f2328; --line: #2e343b; --text: #e6e9ec; --dim: #9aa3ad; --faint: #6c757f;
+    --field: #2a2f35; --bubble-q: #2b3540; --bubble-a: #252a30; --shadow: none;
+    --s0: #7fb3ff; --s1: #ffb36b; --s2: #8fdc8f; --s3: #e59ad6; --s4: #f2d36b; --s5: #7fe0e0;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }  /* 補正の前後でボタンを出し分けるため（.seg の display に負けないように） */
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--text); font: 13px/1.6 "Yu Gothic UI", "Segoe UI", "Meiryo", sans-serif;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+button, select, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.wrap { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 12px; min-height: 0; }
+
+/* 上の帯 */
+header { display: flex; align-items: center; gap: 8px; }
+header .logo { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; }
+header .logo svg { width: 12px; height: 12px; fill: #fff; }
+header h1 { font-size: 15px; margin: 0; font-weight: 700; letter-spacing: .02em; }
+header .spacer { flex: 1; }
+.seg { display: inline-flex; background: var(--field); border-radius: 8px; padding: 2px; gap: 2px; }
+.seg button { border: 0; background: transparent; padding: 3px 10px; border-radius: 6px; color: var(--dim); font-size: 12px; }
+.seg button.on { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+.iconbtn { border: 0; background: transparent; color: var(--dim); width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; }
+.iconbtn:hover { background: var(--field); color: var(--text); }
+.iconbtn.on { color: var(--accent); }
+.iconbtn svg { width: 16px; height: 16px; fill: currentColor; }
+
+/* カード */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.rec { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.rec-main { display: flex; align-items: center; gap: 12px; }
+.recbtn {
+  width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--accent); color: #fff;
+  display: grid; place-items: center; flex: none; transition: background .15s, transform .1s;
+}
+.recbtn:hover { background: var(--accent-hover); }
+.recbtn:active { transform: scale(.96); }
+.recbtn svg { width: 18px; height: 18px; fill: #fff; }
+.recbtn.recording { background: var(--rec); }
+.recbtn.recording:hover { background: var(--rec-hover); }
+.sub.recording { color: var(--rec); font-weight: 700; }
+.meter.recording i { background: var(--rec); }
+.clock { font: 600 22px/1 "Consolas", "Segoe UI", monospace; letter-spacing: .03em; }
+.sub { color: var(--dim); font-size: 12px; }
+.meter { flex: 1; height: 6px; background: var(--field); border-radius: 3px; overflow: hidden; max-width: 120px; }
+.meter i { display: block; height: 100%; width: 0; background: var(--accent); opacity: .55; transition: width .1s; }
+/* 録音を聞き直す操作。誤って音が出ないよう、南京錠を解除するまで押せない */
+.rec-main { flex-wrap: wrap; }
+.player { margin-left: auto; display: flex; align-items: center; gap: 2px; }
+.pbtn { border: 0; background: transparent; color: var(--text); min-width: 30px; height: 30px; padding: 0 3px; border-radius: 6px; display: grid; place-items: center; font: 600 11px/1 "Segoe UI", sans-serif; }
+.pbtn:hover:not(:disabled) { background: var(--field); }
+.pbtn:disabled { color: var(--faint); opacity: .55; cursor: default; }
+.pbtn svg { width: 16px; height: 16px; fill: currentColor; }
+.pbtn.play { background: var(--field); }
+.pbtn.open { color: var(--accent); }
+.seekrow { display: flex; align-items: center; gap: 8px; }
+.seekrow input { flex: 1; min-width: 0; accent-color: var(--accent); margin: 0; }
+.seekrow span { color: var(--dim); font: 11px/1 "Consolas", monospace; white-space: nowrap; }
+body.unlocked .ln .t { text-decoration: underline dotted; }
+body.unlocked .ln:hover .t { color: var(--accent); }
+.ln.now { background: var(--accent-soft); border-radius: 6px; }
+.btn.stop { background: var(--rec); color: #fff; border-color: transparent; }
+.btn.stop:hover { background: var(--rec-hover); }
+.opts { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+.opt { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); font-size: 12px; user-select: none; }
+select, .field {
+  background: var(--field); border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; outline: none;
+}
+select:focus, .field:focus, textarea:focus { border-color: var(--accent); }
+/* 切り替えスイッチ */
+.sw { position: relative; width: 30px; height: 18px; flex: none; }
+.sw input { opacity: 0; width: 0; height: 0; position: absolute; }
+.sw span { position: absolute; inset: 0; background: var(--line); border-radius: 9px; transition: .15s; cursor: pointer; }
+.sw span::after { content: ""; position: absolute; width: 14px; height: 14px; left: 2px; top: 2px; background: #fff; border-radius: 50%; transition: .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.sw input:checked + span { background: var(--accent); }
+.sw input:checked + span::after { transform: translateX(12px); }
+/* 「⋯」「＋」「設定」を押すと開く小さな窓。ふだん使わない操作はここにしまう */
+.menu { position: relative; flex: none; }
+.pop { position: fixed; z-index: 20; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 6px; box-shadow: 0 6px 20px rgba(16, 24, 40, .18); display: flex; flex-direction: column; gap: 2px; min-width: 190px; max-width: calc(100vw - 24px); }
+.pop.wide { width: 340px; padding: 10px 12px; gap: 8px; }
+.pop .item { border: 0; background: transparent; text-align: left; padding: 6px 8px; border-radius: 6px; white-space: nowrap; }
+.pop .item:hover { background: var(--field); }
+.pop .item:disabled { opacity: .45; cursor: default; }
+.pop .sw-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.pop .sw-item:hover { background: var(--field); }
+.pop .sw-item small { display: block; color: var(--dim); font-size: 11px; line-height: 1.4; }
+.pop hr { border: 0; border-top: 1px solid var(--line); margin: 3px 0; width: 100%; }
+/* いま使っている道具。押すと切れる */
+.pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill { border: 0; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 1px 9px; font-size: 11px; }
+.pill::after { content: " ×"; }
+.grid2 { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 10px; align-items: center; font-size: 12px; }
+.grid2 select { width: 100%; min-width: 0; }
+.grid2 label { color: var(--dim); }
+.path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); }
+.row { display: flex; gap: 6px; align-items: center; min-width: 0; }
+
+/* ボタン */
+.btn { border: 1px solid var(--line); background: var(--card); padding: 5px 10px; border-radius: 8px; white-space: nowrap; }
+.btn:hover { background: var(--field); }
+.btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+.btn.primary:hover { background: var(--accent-hover); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--dim); }
+.btn.ghost:hover { background: var(--field); color: var(--text); }
+.btn:disabled { opacity: .45; cursor: default; }
+.chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 3px 11px; font-size: 12px; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+/* 会議の行 */
+.meeting { display: flex; flex-direction: column; gap: 6px; }
+.meeting select { flex: 1; min-width: 0; }
+.meeting .field { flex: 1; min-width: 0; }
+
+/* 文字起こしと質問の2枚 */
+.panes { flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.pane { display: flex; flex-direction: column; min-height: 0; }
+.pane.tr { flex: 3; }
+.pane.chat { flex: 2; }
+/* AI の窓を閉じると見出しだけが一番下に残り、文字起こしが広がる。開くと元の大きさに戻る */
+.pane.chat.closed { flex: none !important; }
+.pane.chat.closed .pane-b, .pane.chat.closed .composer { display: none; }
+.pane.chat.closed .pane-h { border-bottom: 0; }
+.panes:has(.pane.chat.closed) .pane.tr { flex: 1 1 0 !important; }
+/* 2枚の境目。つまんで上下に動かすと大きさが変わる */
+.splitter { height: 10px; margin: -5px 0; cursor: row-resize; position: relative; flex: none; z-index: 1; }
+.splitter::after { content: ""; position: absolute; left: 50%; top: 3px; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--line); transition: background .15s; }
+.splitter:hover::after, .splitter.drag::after { background: var(--accent); }
+body.resizing { cursor: row-resize; user-select: none; }
+.pane-h { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.pane-h h2 { font-size: 13px; margin: 0; font-weight: 700; }
+.pane-h .count { color: var(--faint); font-size: 12px; }
+.pane-b { flex: 1; overflow-y: auto; padding: 8px 12px; min-height: 0; }
+.empty { color: var(--faint); text-align: center; padding: 24px 8px; font-size: 12px; }
+.ln { display: grid; grid-template-columns: 44px 1fr 22px; gap: 0 8px; padding: 3px 0; }
+/* 発言をグレーにするボタン。ふだんは隠し、指を置いた発言とグレーの発言にだけ出す */
+.ln .hide { width: 22px; height: 22px; padding: 3px; border: 0; background: transparent; color: var(--dim); border-radius: 4px; visibility: hidden; display: grid; place-items: center; }
+.ln .hide svg { width: 16px; height: 16px; fill: currentColor; }
+.ln:hover .hide, .ln.off .hide, .ln .hide:focus-visible { visibility: visible; }
+.ln .hide:hover { background: var(--line); color: var(--text); }
+.ln.off .hide { color: var(--rec); }
+.ln .t { color: var(--faint); font: 11px/1.9 "Consolas", monospace; }
+.ln .spk { font-weight: 700; font-size: 11px; margin-right: 6px; cursor: pointer; border-radius: 4px; padding: 0 2px; }
+.ln .spk:hover { background: var(--accent-soft); }
+.ln .pii { font-size: 10px; color: var(--rec); border: 1px solid var(--rec); border-radius: 4px; padding: 0 3px; margin-right: 4px; }
+.banner { background: var(--accent-soft); color: var(--accent); font-size: 11px; padding: 3px 12px; }
+#spkPop input[type=text] { width: 100%; }
+.ln .fx { color: var(--faint); font-size: 11px; margin-right: 3px; }
+/* 押すとグレーになる発言（個人情報など）。Claude と engram に渡さない。もう一度押すと戻る */
+.pane.tr.dragover { outline: 2px dashed var(--accent); outline-offset: -4px; }
+body.noclaude .ln { cursor: default; }
+.ln { cursor: pointer; border-radius: 6px; }
+.ln:hover { background: var(--field); }
+.ln.off, .ln.off .spk, .ln.off .t { color: var(--faint) !important; }
+.ln.off .body { opacity: .55; }
+.s0 { color: var(--s0); } .s1 { color: var(--s1); } .s2 { color: var(--s2); } .s3 { color: var(--s3); } .s4 { color: var(--s4); } .s5 { color: var(--s5); }
+.msg { margin: 6px 0; display: flex; }
+.msg.q { justify-content: flex-end; }
+.msg .b { max-width: 88%; padding: 7px 11px; border-radius: 12px; white-space: pre-wrap; word-break: break-word; }
+.msg.q .b { background: var(--bubble-q); border-bottom-right-radius: 4px; }
+.msg.a .b { background: var(--bubble-a); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.msg.a.wait .b { color: var(--dim); }
+.composer { border-top: 1px solid var(--line); padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
+.quick { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.docs { display: flex; gap: 6px; flex-wrap: wrap; }
+.doc { background: var(--field); border-radius: 6px; padding: 1px 8px; font-size: 11px; color: var(--dim); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ask { display: flex; gap: 6px; align-items: flex-end; }
+.ask textarea { flex: 1; resize: none; background: var(--field); border: 1px solid transparent; border-radius: 10px; padding: 7px 10px; min-height: 36px; max-height: 120px; outline: none; }
+.foot { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.status { padding: 6px 14px; color: var(--dim); font-size: 12px; border-top: 1px solid var(--line); background: var(--card); min-height: 30px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 準備の確認（足りないものがあるときだけ出す） */
+.notice { padding: 10px 12px; font-size: 12px; border-color: var(--rec); }
+.notice-h { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.notice-h b { flex: 1; }
+.notice ul { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.notice li .nm { font-weight: 700; }
+.notice li.need .nm { color: var(--rec); }
+.notice li .hp { color: var(--dim); }
+::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo"><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg></div>
+    <h1>Sidenote</h1>
+    <div class="spacer"></div>
+    <button class="iconbtn" id="hideBtn" title="窓を隠して、画面の右端の小さなつまみだけにします（記録は続きます）"><svg viewBox="0 0 24 24"><path d="M4 11h9.200L9.600 7.400 11 6l6 6-6 6-1.400-1.400 3.600-3.600H4zm15-7h2v16h-2z"/></svg></button>
+    <button class="iconbtn" id="shotBtn" title="画面を撮ってこの回に保存します（Sidenote の窓は写りません。AI には渡しません）"><svg viewBox="0 0 24 24"><path d="M9 3 7.2 5H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3.200L15 3H9zm3 5a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg></button>
+    <div class="menu">
+      <button class="iconbtn" data-menu title="設定（マイク・保存先・自動停止など）"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.4-2-1.6zM13 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" transform="translate(-1)"/></svg></button>
+      <div class="pop wide" hidden>
+        <div class="grid2">
+          <label>自動で止める</label><select id="limit"></select>
+          <label>拾う音</label>
+          <div class="row">
+            <select id="sound" style="min-width:0;flex:1" title="この回で拾う音です。新しい回は既定の音から始まります">
+              <option value="mic">マイクだけ（対面の会議）</option>
+              <option value="both">マイクとパソコンの音（Web 会議）</option>
+              <option value="pc">パソコンの音だけ</option>
+            </select>
+            <button class="btn ghost" id="soundDefault" hidden title="新しい回で初めから選ばれる音にします">既定にする</button>
+          </div>
+          <span class="path" id="soundHelp" style="grid-column:1/-1;white-space:normal" hidden>パソコンから出る音をすべて録ります（通知音なども入ります）。参加者全員の同意を取ってください。スピーカーだと相手の声が二重に入るので、イヤホンをおすすめします</span>
+          <label>マイク</label><select id="mic"></select>
+          <label>話者を分ける</label><label class="sw"><input type="checkbox" id="diarize"><span></span></label>
+          <label>保存先</label>
+          <div class="row"><span class="path" id="dataDir"></span><button class="btn ghost" id="chooseData">変更…</button><button class="btn ghost" id="openData">開く</button></div>
+          <label>AI の接続先</label>
+          <select id="aiProvider"></select>
+          <div id="aiBox" class="grid2" style="grid-column:1/-1" hidden>
+            <label id="aiUrlL">URL</label>
+            <input class="field" id="aiUrl" spellcheck="false" autocomplete="off">
+            <label id="aiKeyL">API キー</label>
+            <div class="row" id="aiKeyRow"><input class="field" id="aiKey" type="password" autocomplete="new-password" spellcheck="false"><button class="btn ghost" id="aiKeyDel" hidden>消す</button></div>
+            <label>モデル</label>
+            <div class="row"><select id="aiModel" style="min-width:0;flex:1"></select><input class="field" id="aiModelText" spellcheck="false" hidden style="min-width:0;flex:1"><button class="btn ghost" id="aiTest" title="短い文だけを送って確かめます。会議の中身は送りません">接続を試す</button></div>
+          </div>
+          <span class="path" id="aiHelp" style="grid-column:1/-1;white-space:normal"></span>
+          <label id="engramOnLabel">engram へ送る</label>
+          <label class="sw" id="engramOnSw"><input type="checkbox" id="engramOn"><span></span></label>
+          <label>雑音除去</label>
+          <div class="row"><label class="sw"><input type="checkbox" id="denoiseOn"><span></span></label><span class="path" id="denoiseHelp" style="white-space:normal"></span></div>
+          <label>画面の色</label>
+          <div class="seg" id="theme" style="justify-self:start">
+            <button data-v="system">システム</button><button data-v="light">ライト</button><button data-v="dark">ダーク</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="card notice" id="notice" hidden>
+    <div class="notice-h"><b>準備の確認</b><button class="btn ghost" id="noticeClose">閉じる</button></div>
+    <ul id="noticeList"></ul>
+  </section>
+
+  <section class="card rec">
+    <div class="rec-main">
+      <button class="recbtn" id="rec" title="記録を開始"><svg id="recIcon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg></button>
+      <div>
+        <div class="clock" id="clock">00:00</div>
+        <div class="sub" id="recSub">待機中</div>
+      </div>
+      <div class="meter" id="meterBox" hidden><i id="meter"></i></div>
+      <div class="player" id="player">
+        <button class="pbtn" id="pLock"><svg viewBox="0 0 24 24"><path id="pLockIcon"/></svg></button>
+        <button class="pbtn" data-skip="-10" title="10秒戻す">-10</button>
+        <button class="pbtn" data-skip="-5" title="5秒戻す">-5</button>
+        <button class="pbtn" id="pRew" title="巻き戻し（音は出ません）。押すたびに 2倍→4倍→8倍→通常の再生"><svg viewBox="0 0 24 24"><path d="M11 6v12L2.5 12zM21 6v12l-8.5-6z"/></svg></button>
+        <button class="pbtn play" id="pPlay" title="再生"><svg viewBox="0 0 24 24"><path id="pPlayIcon" d="M8 5v14l11-7z"/></svg></button>
+        <button class="pbtn" id="pFwd" title="早送り（音は出たまま）。押すたびに 1.25倍→1.5倍→2倍→3倍→1倍"><svg viewBox="0 0 24 24"><path d="M13 6v12l8.5-6zM3 6v12l8.5-6z"/></svg></button>
+        <button class="pbtn" data-skip="5" title="5秒進める">+5</button>
+        <button class="pbtn" data-skip="10" title="10秒進める">+10</button>
+      </div>
+    </div>
+    <div class="seekrow" id="seekRow" hidden>
+      <input type="range" id="seek" min="0" max="1000" value="0" title="聞く場所を動かす">
+      <span id="pTime">00:00 / 00:00</span>
+    </div>
+  </section>
+
+  <section class="meeting">
+    <div class="row" title="同じ会議の回を1つのフォルダにまとめます。新しい回は選んでいる会議名のフォルダに保存します">
+      <select id="series"></select>
+      <div class="menu">
+        <button class="iconbtn" data-menu title="会議名の操作">⋯</button>
+        <div class="pop" hidden>
+          <button class="item" data-close id="seriesNew" title="保存先の中に会議名のフォルダを作る">＋ 新しい会議名</button>
+          <button class="item" data-close id="seriesAdd" title="好きな場所のフォルダを会議名として登録する">フォルダを登録…</button>
+          <button class="item" data-close id="seriesOpen">フォルダを開く</button>
+          <button class="item" data-close id="shotsOpen">この回のスクリーンショットを開く</button>
+          <hr>
+          <button class="item" data-close id="clearBtn" title="画面を空にして、次の開始を新しい会議にする（記録は消さない）">画面をクリア</button>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <select id="meetings"></select>
+      <button class="btn" id="newBtn">＋ 新しい回</button>
+    </div>
+    <input class="field" id="title" placeholder="この回の題名（例: 第3回 システム更新の打合せ）">
+  </section>
+
+  <div class="panes">
+    <section class="card pane tr">
+      <div class="pane-h">
+        <h2>文字起こし</h2>
+        <span class="count" id="lineCount"></span>
+        <div class="spacer" style="flex:1"></div>
+        <button class="btn" id="fixBtn" title="AI が前後の文脈・資料・辞書から聞き間違いを直します">✨ 補正</button>
+        <div class="seg" id="view" hidden><button data-v="fixed" class="on">補正後</button><button data-v="orig">元の文字起こし</button></div>
+        <button class="btn ghost" id="refixBtn" hidden title="新しく増えた発言を補正します">再補正</button>
+        <button class="btn stop" id="fixStop" hidden title="補正を止めます。直した分は残ります">■ 止める</button>
+        <div class="menu" id="trMenu">
+          <button class="iconbtn" data-menu title="文字起こしの操作">⋯</button>
+          <div class="pop" hidden>
+            <button class="item" id="spkSetBtn" title="話者A は〇〇さん、のように、この回の話者に名前を付けます">話者の設定</button>
+            <button class="item" data-close id="piiBtn" title="このパソコンの中だけで判定します。AI へは何も送りません">個人情報を判定してグレーに</button>
+            <button class="item" data-close id="denoiseBtn" hidden title="元の文字起こしは残し、別の版を作ります。このパソコンの中だけで処理します">雑音を除いて文字にし直す</button>
+            <button class="item" data-close id="cleanView" hidden>雑音除去後の版を見る</button>
+          </div>
+        </div>
+      </div>
+      <div class="banner" id="cleanBanner" hidden>雑音除去後の版を表示中（読むだけ）。話者の記号は元の版と対応しません</div>
+      <div class="pane-b" id="lines"><div class="empty">「開始」を押すか、音声ファイルをここへドラッグすると、発言が順に出ます</div></div>
+    </section>
+
+    <div class="splitter" id="split" title="ドラッグで大きさを変える"></div>
+
+    <section class="card pane chat">
+      <div class="pane-h">
+        <h2>AI に聞く</h2>
+        <span class="count" id="aiName"></span>
+        <div style="flex:1"></div>
+        <button class="iconbtn" id="chatToggle" title="閉じる"><svg viewBox="0 0 24 24"><path id="chatToggleIcon" d="M5 8h14l-7 9z"/></svg></button>
+        <div class="menu">
+          <button class="iconbtn" data-menu title="やり取りの操作">⋯</button>
+          <div class="pop" hidden>
+            <button class="item" data-close id="saveChat" title="やり取りをファイルにして会議のフォルダに保存">会話を保存</button>
+            <button class="item" data-close id="engramBtn" hidden title="押したときだけ、会議の要点をまとめて engram に送ります（自動では送りません）。伏せたい発言は先に伏せてください">engram に要点を送る</button>
+          </div>
+        </div>
+      </div>
+      <div class="pane-b" id="chat"><div class="empty">要約や「あの件どうだっけ？」のような質問ができます</div></div>
+      <div class="composer">
+        <div class="quick">
+          <button class="chip" data-q="ここまでの会議の内容を、話題ごとに短く要約してください。">要約</button>
+          <button class="chip" data-q="この会議で決まったことと、誰が何をいつまでにやるか（宿題）を箇条書きにしてください。">決まったこと</button>
+          <button class="chip" data-q="まだ決まっていない論点や、持ち帰りになったことを挙げてください。">未決</button>
+        </div>
+        <div class="docs" id="docs"></div>
+        <div class="pills" id="pills"></div>
+        <div class="ask">
+          <div class="menu">
+            <button class="iconbtn" data-menu title="資料の添付と、AI に使わせる道具" style="font-size:18px">＋</button>
+            <div class="pop" hidden>
+              <button class="item" data-close id="attach" title="PDF・Word・Excel・PowerPoint・画像">資料を添付…</button>
+              <hr>
+              <label class="sw-item"><span class="sw"><input type="checkbox" id="past"><span></span></span><span>過去の会議も<small>同じ会議名の前の回も読みます（会議名を選んでいるときだけ）</small></span></label>
+              <label class="sw-item" id="webItem"><span class="sw"><input type="checkbox" id="web"><span></span></span><span>Web 検索<small>検索語が外へ出ます</small></span></label>
+              <label class="sw-item" id="connItem"><span class="sw"><input type="checkbox" id="connectors"><span></span></span><span>コネクタ<small>メール・カレンダー・ドライブなどを読むだけ</small></span></label>
+            </div>
+          </div>
+          <textarea id="q" rows="1" placeholder="質問を入力（Enter で送信、Shift+Enter で改行）"></textarea>
+          <button class="btn primary" id="send">送信</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="status" id="status"></div>
+<div class="pop wide" id="spkSet" hidden>
+  <b>この回の話者</b>
+  <div id="spkSetList" style="display:flex;flex-direction:column;gap:8px;max-height:50vh;overflow-y:auto"></div>
+  <span class="path" style="white-space:normal">保存すると、これまでの発言と、これから増える発言に使います。1人が2つの話者に分かれたときは、両方に同じ名前を入れてください。名前は質問のときに AI にも渡ります</span>
+  <div class="row" style="justify-content:flex-end;gap:8px">
+    <button class="btn" id="spkSetCancel">キャンセル</button>
+    <button class="btn primary" id="spkSetSave">保存</button>
+  </div>
+</div>
+<div class="pop" id="spkPop" hidden>
+  <div id="spkList" style="display:flex;flex-direction:column;gap:2px"></div>
+  <hr>
+  <input class="field" type="text" id="spkName" placeholder="名前を入力（Enter で決定）" maxlength="30">
+  <label class="sw-item"><span class="sw"><input type="checkbox" id="spkAll"><span></span></span><span>同じ話者の発言をまとめて直す</span></label>
+</div>
+
+<script>
+const T = "__TOKEN__";
+const $ = (id) => document.getElementById(id);
+const api = (op, body = {}) => fetch(`/api/${op}?t=${T}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+let S = null, cur = null, recording = false, speakers = {}, view = "fixed", claudeOk = true, importing = false, showClean = false;
+const spkLabel = (s) => (String(s).length === 1 ? "話者" + s : String(s));
+
+const mmss = (ms) => { const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}` : `${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}`; };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const status = (t) => { $("status").textContent = t || ""; };
+
+// テーマ
+function applyTheme(v) {
+  if (v === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.dataset.theme = v;
+  document.querySelectorAll("#theme button").forEach((b) => b.classList.toggle("on", b.dataset.v === v));
+}
+document.querySelectorAll("#theme button").forEach((b) => b.onclick = () => { applyTheme(b.dataset.v); api("settings", { theme: b.dataset.v }); });
+// 手前に固定は Edge の窓では外から効かない（Edge が外してしまう）ので、PowerToys の Win+Ctrl+T を使う
+
+// 文字起こし
+function spkClass(s) { if (!(s in speakers)) speakers[s] = Object.keys(speakers).length % 6; return "s" + speakers[s]; }
+function lineHtml(r, i) {
+  const fixed = r.fixed && view === "fixed";
+  const hideTip = r.hidden ? "グレーの発言は AI（と engram）に渡しません。押すと戻します" : "押すとグレーにして、AI（と engram）に渡さなくします（記録には残ります）";
+  // 南京錠を解除しているあいだは、発言を押すとそこから聞く。施錠中は発言を押すとグレーになる。右端のボタンはいつでもグレーの切り替え
+  const tip = unlocked ? "押すと、ここから聞けます" : claudeOk && !showClean ? hideTip : "";
+  const hideBtn = claudeOk && !showClean ? `<button class="hide" title="${hideTip}"><svg viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 4.6 7l2.9 2.9A11.8 11.8 0 0 0 23 12a11.8 11.8 0 0 0-14.9-6.8l2.1 2.1A5 5 0 0 1 12 7zM2 4.3l2.7 2.7A11.8 11.8 0 0 0 1 12a11.8 11.8 0 0 0 15.4 6.7l3.3 3.3 1.3-1.3L3.3 3zm5.5 5.5 1.6 1.6A3 3 0 0 0 12.6 15l1.6 1.6A5 5 0 0 1 7.5 9.800z"/></svg></button>` : "<span></span>";
+  return `<div class="ln${r.hidden ? " off" : ""}${i === playIdx ? " now" : ""}" data-i="${i}" title="${tip}"><span class="t">${mmss(r.start_ms)}</span><div class="body"><span class="spk ${spkClass(r.speaker)}" title="押すと話者を直せます">${esc(spkLabel(r.speaker))}</span>${r.hidden && r.pii ? `<span class="pii">${esc(r.pii.join("・"))}</span>` : ""}${fixed ? '<span class="fx">✎</span>' : ""}${esc(fixed ? r.fixed : r.text)}</div>${hideBtn}</div>`;
+}
+// 発言を押すとグレー（伏せる）にする。文字を選んでいるとき（写すため）は切り替えない
+$("lines").addEventListener("click", async (e) => {
+  const el = e.target.closest(".ln"); if (!el || !cur) return;
+  const hideBtn = e.target.closest(".hide");
+  if (!showClean && !hideBtn) {
+    const spk = e.target.closest(".spk");
+    if (spk) { e.stopPropagation(); openSpk(spk, Number(el.dataset.i)); return; }
+  }
+  if (!hideBtn && String(window.getSelection())) return;  // 文字を選んでいるとき（写すため）は何もしない
+  if (!hideBtn && unlocked) {  // 解除中は、その発言から聞く（グレーの発言も聞いて確かめられる）
+    const list = showClean ? cur.clean : cur.lines, r = list[Number(el.dataset.i)];
+    if (r) { rewStopForJump(); seekTo(Math.max(0, r.start_ms / 1000 - 0.5)); playAudio(); }
+    return;
+  }
+  if (!hideBtn && e.target.closest(".t")) { status("南京錠を解除すると、発言を押してそこから聞けます"); return; }
+  if (showClean || !claudeOk) return;  // 雑音除去後の版は読むだけ
+  const i = Number(el.dataset.i), on = !cur.lines[i].hidden;
+  cur.lines[i].hidden = on; renderLines();
+  const id = cur.id, lines = await api("hide", { id, i, on, at: cur.lines[i].start_ms });
+  if (!lines) {  // 保存できなかった。グレーに見えるのに AI へ渡る、という状態を残さない
+    if (cur && cur.id === id) { await reloadLines(); }
+    status(on ? "グレーにできませんでした。この発言は AI に渡ります。もう一度押してください" : "戻せませんでした。もう一度押してください");
+    return;
+  }
+  if (cur && cur.id === id) { cur.lines = lines; renderLines(); }
+  status(on ? "グレーにしました。この発言は AI（と engram）に渡しません" : "戻しました");
+});
+// 発言の一覧を記録から読み直す（画面と記録が食い違ったとき）
+async function reloadLines() {
+  const id = cur && cur.id, p = id ? await api("open", { id }) : null;
+  if (p && cur && cur.id === p.id) { cur.lines = p.lines; renderLines(); }
+  else if (cur && cur.lines) { renderLines(); }
+}
+// 話者を手で直す小さな窓
+let spkI = -1;
+function openSpk(anchor, i) {
+  closeMenus(); spkI = i;
+  const names = [...new Set(cur.lines.map((r) => String(r.speaker)))];
+  $("spkList").innerHTML = names.map((n) => `<button class="item" data-name="${esc(n)}">${esc(spkLabel(n))}</button>`).join("");
+  $("spkName").value = ""; $("spkAll").checked = false;
+  const pop = $("spkPop"); pop.hidden = false;
+  const r = anchor.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px";
+  pop.style.top = (r.bottom + h + 8 > innerHeight ? Math.max(8, r.top - h - 4) : r.bottom + 4) + "px";
+}
+async function setSpk(name) {
+  name = name.trim(); $("spkPop").hidden = true; if (!name || !cur) return;
+  const lines = await api("speaker", { id: cur.id, i: spkI, name, all: $("spkAll").checked });
+  if (lines) { cur.lines = lines; renderLines(); status(`${spkLabel(name)} に直しました`); }
+}
+$("spkList").addEventListener("click", (e) => { const b = e.target.closest("[data-name]"); if (b) setSpk(b.dataset.name); });
+$("spkName").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) setSpk($("spkName").value); });
+// 話者の設定: 話者A は〇〇さん、を回ごとに決める。保存を押すまでは発言を変えない
+let spkSetId = null;
+const spkSetInputs = () => [...$("spkSetList").querySelectorAll("input[data-code]")];
+const spkSetDirty = () => !$("spkSet").hidden && spkSetInputs().some((i) => i.value.trim() !== i.dataset.orig);
+function renderSpkSet(rows) {
+  $("spkSetList").innerHTML = rows.length ? rows.map((r) => `<div><div class="row" style="gap:8px"><span style="flex:none;width:56px;font-weight:700">${esc(spkLabel(r.code))}</span><input class="field" style="flex:1;min-width:0" data-code="${esc(r.code)}" data-orig="${esc(r.name)}" value="${esc(r.name)}" placeholder="名前" maxlength="30" autocomplete="off"><span class="count" style="flex:none;color:var(--faint);font-size:11px">${r.count}件</span></div>${r.sample ? `<div class="path" style="white-space:normal;margin-left:64px;font-size:11px">${esc(r.sample)}</div>` : ""}</div>`).join("") : `<div class="path">まだ発言がありません</div>`;
+}
+$("spkSetBtn").onclick = async (e) => {
+  e.stopPropagation();
+  const r0 = $("trMenu").getBoundingClientRect();
+  closeMenus();
+  if (!cur) { status("会議を選んでから押してください"); return; }
+  if (spkSetDirty()) return;  // 入れかけの名前を読み直しで消さない
+  const id = cur.id, d = await api("speaker_rows");
+  if (!d || !cur || cur.id !== id) return;
+  spkSetId = id;
+  renderSpkSet(d.rows);
+  const pop = $("spkSet"); pop.hidden = false;
+  pop.style.left = Math.max(8, innerWidth - pop.offsetWidth - 12) + "px";
+  pop.style.top = Math.min(r0.bottom + 4, Math.max(8, innerHeight - pop.offsetHeight - 8)) + "px";
+  const first = $("spkSetList").querySelector("input");
+  if (first) first.focus();
+};
+$("spkSetCancel").onclick = () => { $("spkSet").hidden = true; };
+$("spkSetSave").onclick = async () => {
+  const names = {};
+  spkSetInputs().forEach((i) => { if (i.value.trim() !== i.dataset.orig) names[i.dataset.code] = i.value.trim(); });
+  if (!Object.keys(names).length) { $("spkSet").hidden = true; return; }
+  const d = await api("speaker_names", { id: spkSetId, names });
+  if (!d) { status("話者の名前を保存できませんでした"); return; }
+  $("spkSet").hidden = true;
+  if (cur && cur.id === spkSetId) { cur.lines = d.lines; renderLines(); }
+  status("話者の名前を保存しました");
+};
+// Enter で次の欄へ。最後の欄からは保存のボタンへ。Esc でキャンセル
+$("spkSet").addEventListener("keydown", (e) => {
+  if (e.isComposing) return;
+  if (e.key === "Escape") { e.stopPropagation(); $("spkSetCancel").click(); return; }
+  if (e.key !== "Enter" || e.target.dataset.code === undefined) return;
+  e.preventDefault();
+  const list = spkSetInputs(), next = list[list.indexOf(e.target) + 1];
+  (next || $("spkSetSave")).focus();
+});
+function renderLines() {
+  const box = $("lines"), atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  const clean = cur ? cur.clean || [] : [];
+  if (!clean.length) showClean = false;
+  const lines = showClean ? clean : cur ? cur.lines : [];
+  $("cleanBanner").hidden = !showClean;
+  $("cleanView").hidden = !clean.length || !$("denoiseOn").checked; $("cleanView").textContent = showClean ? "元の文字起こしに戻す" : "雑音除去後の版を見る";
+  $("piiBtn").hidden = !claudeOk;
+  syncAudio();
+  const empty = importing ? "文字起こししています…" : "● を押すか、音声ファイルをここへドラッグすると、発言が順に出ます";
+  box.innerHTML = lines.length ? lines.map((r, i) => lineHtml(r, i)).join("") : `<div class="empty">${empty}</div>`;
+  if (atEnd) box.scrollTop = box.scrollHeight;
+  if (showClean) { $("lineCount").textContent = `${lines.length}件`; $("fixBtn").hidden = $("view").hidden = $("refixBtn").hidden = true; return; }
+  const nFixed = lines.filter((r) => r.fixed).length, nTodo = lines.filter((r) => !r.checked).length;
+  const nOff = lines.filter((r) => r.hidden).length;
+  $("lineCount").textContent = lines.length ? `${lines.length}件` + (nFixed ? ` ・ ✎${nFixed}` : "") + (nOff ? ` ・ グレー${nOff}` : "") : "";
+  // 補正する前は「補正」ボタン。一度補正したら「補正後｜元の文字起こし」の切り替えと「再補正」に変わる
+  const corrected = lines.some((r) => r.checked);
+  $("fixBtn").hidden = corrected || !claudeOk; $("view").hidden = !corrected; $("refixBtn").hidden = !corrected || !claudeOk;
+  $("fixBtn").disabled = !lines.length; $("refixBtn").disabled = !nTodo;
+  $("refixBtn").textContent = nTodo ? `再補正（${nTodo}）` : "再補正";
+}
+document.querySelectorAll("#view button").forEach((b) => b.onclick = () => {
+  view = b.dataset.v; document.querySelectorAll("#view button").forEach((x) => x.classList.toggle("on", x === b)); renderLines(); });
+$("piiBtn").onclick = async () => { if (!cur) { status("会議を選んでから押してください"); return; } const l = await api("pii"); if (l) { cur.lines = l; showClean = false; renderLines(); } };
+$("denoiseBtn").onclick = () => { if (!cur) { status("会議を選んでから押してください"); return; } if (recording) { status("記録を止めてから押してください"); return; } importing = true; $("rec").disabled = true; api("denoise"); };
+$("cleanView").onclick = () => { showClean = !showClean; renderLines(); };
+$("fixBtn").onclick = $("refixBtn").onclick = () => { if (!cur) return; $("fixBtn").disabled = $("refixBtn").disabled = true; $("fixStop").hidden = false; status("AI が文字起こしを補正しています"); api("fix"); };
+$("fixStop").onclick = () => api("cancel", { what: "fix" });
+
+// 会話
+function msgHtml(q, a, wait) { return `<div class="msg q"><div class="b">${esc(q)}</div></div><div class="msg a${wait ? " wait" : ""}"><div class="b">${esc(a)}</div></div>`; }
+function renderChat() {
+  const box = $("chat"), chats = cur ? cur.chats : [];
+  box.innerHTML = chats.length ? chats.map((c) => msgHtml(c.q, c.a)).join("") : `<div class="empty">要約や「あの件どうだっけ？」のような質問ができます</div>`;
+  box.scrollTop = box.scrollHeight;
+}
+function renderDocs() {
+  const docs = cur ? cur.docs : [];
+  $("docs").innerHTML = docs.map((d) => `<span class="doc" title="${esc(d)}">📄 ${esc(d)}</span>`).join("") + (docs.length ? `<button class="btn ghost" style="padding:0 6px;font-size:11px" id="openDocs">開く</button>` : "");
+  if (docs.length) $("openDocs").onclick = () => api("open_folder", { which: "docs" });
+}
+// 答えを待つあいだ、送信ボタンは中止ボタン（■）になる
+let asking = false;
+function setAsking(on) {
+  asking = on;
+  $("send").textContent = on ? "■" : "送信"; $("send").title = on ? "答えを待つのをやめる" : "";
+  $("send").classList.toggle("stop", on); $("send").classList.toggle("primary", !on);
+}
+function ask(q) {
+  q = q.trim(); if (!q) return;
+  if (asking) { status("前の質問の答えを待っています。止めるときは ■ を押してください"); return; }
+  if (!cur) { status("会議を選ぶか、開始してから質問してください"); return; }
+  setAsking(true);
+  const box = $("chat"); if (!cur.chats.length) box.innerHTML = "";
+  box.insertAdjacentHTML("beforeend", msgHtml(q, "考えています…", true)); box.scrollTop = box.scrollHeight;
+  $("q").value = ""; autoGrow(); status(S.ai.local ? "ローカル LLM に聞いています（数分かかることがあります）" : "AI に聞いています（10秒ほど）");
+  api("ask", { q, past: $("past").checked, web: $("web").checked, connectors: $("connectors").checked }).then((r) => { if (!r) { setAsking(false); renderChat(); status("AI の接続先の準備ができていません（右上の歯車）"); } });
+}
+$("send").onclick = () => { if (asking) api("cancel"); else ask($("q").value); };
+$("q").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); ask($("q").value); } });
+function autoGrow() { const t = $("q"); t.style.height = "auto"; t.style.height = Math.min(120, t.scrollHeight) + "px"; }
+$("q").addEventListener("input", autoGrow);
+document.querySelectorAll(".chip[data-q]").forEach((b) => b.onclick = () => ask(b.dataset.q));
+$("attach").onclick = () => api("attach");
+$("saveChat").onclick = () => api("save_chat");
+$("engramBtn").onclick = () => api("engram");
+$("past").onchange = () => { api("settings", { past: $("past").checked }); renderPills(); };
+// Web 検索とコネクタは、外へつながるので覚えない。窓を開くたびに切れた状態から始める
+$("web").onchange = () => { renderPills(); if ($("web").checked) status("Web 検索：会議の話題に基づく言葉が、検索語として外へ出ます"); };
+$("connectors").onchange = () => { renderPills(); if ($("connectors").checked) status("コネクタ：Claude がメール・カレンダー・ドライブなどを読めます（読むだけで、送信や書き換えはしません）"); };
+// いま使っている道具を質問欄の上に出す。押すと切れる
+const PILLS = { past: "過去の会議", web: "Web 検索", connectors: "コネクタ" };
+function renderPills() {
+  // 会議名なしの回には「同じ会議名の前の回」が無い（裏でも渡さない）
+  $("past").disabled = !$("series").value;
+  $("past").closest("label").style.opacity = $("past").disabled ? ".5" : "";
+  $("pills").innerHTML = Object.keys(PILLS).filter((k) => $(k).checked && !$(k).disabled).map((k) => `<button class="pill" data-k="${k}" title="押すと切ります">${PILLS[k]}</button>`).join("");
+}
+$("pills").addEventListener("click", (e) => {
+  const k = e.target.dataset.k; if (!k) return;
+  $(k).checked = false; $(k).onchange();
+});
+
+// 「⋯」「＋」「設定」の小さな窓。押すと開き、外を押すか data-close の項目を押すと閉じる
+// 話者の設定は、入れかけの名前があれば外を押しても閉じない（保存かキャンセルで閉じる）
+const closeMenus = () => document.querySelectorAll(".pop").forEach((p) => { if (p.id !== "spkSet" || !spkSetDirty()) p.hidden = true; });
+document.querySelectorAll("[data-menu]").forEach((b) => b.onclick = (e) => {
+  e.stopPropagation();
+  const pop = b.nextElementSibling, wasOpen = !pop.hidden;
+  closeMenus(); if (wasOpen) return;
+  pop.hidden = false;
+  const r = b.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = Math.max(8, Math.min(r.left, innerWidth - w - 8)) + "px";
+  pop.style.top = (r.bottom + h + 8 > innerHeight ? Math.max(8, r.top - h - 4) : r.bottom + 4) + "px";
+});
+document.querySelectorAll(".pop").forEach((p) => p.addEventListener("click", (e) => { e.stopPropagation(); if (e.target.closest("[data-close]")) closeMenus(); }));
+document.addEventListener("click", () => {
+  closeMenus(); $("spkPop").hidden = true;
+  if (spkSetDirty()) status("話者の名前はまだ保存していません。保存かキャンセルを押してください");
+});
+$("spkPop").addEventListener("click", (e) => e.stopPropagation());
+
+// 会議
+function showMeeting(p) {
+  if (!p || !cur || p.id !== cur.id) { setUnlocked(false); $("spkSet").hidden = true; }  // 別の回を開いたら施錠に戻し、話者の設定も閉じる
+  cur = p; speakers = {};
+  if (p) soundPending = null;
+  $("title").value = p ? p.title : "";
+  $("clock").textContent = mmss(p ? p.recorded_ms : 0);
+  syncSound();
+  renderLines(); renderChat(); renderDocs(); renderPlayer();
+}
+
+// 録音を聞き直す。誤って音が出ないよう、南京錠を解除するまで押せない
+const audio = new Audio();
+// 早送りは音を出したまま速くする。巻き戻しは逆再生の音を聞かせないよう、音を止めて場所だけ戻す
+const FWD_RATES = [1, 1.25, 1.5, 2, 3], REW_RATES = [0, 2, 4, 8], REW_STEP_MS = 200;
+let rewRate = 0, rewTimer = null;
+const LOCK_ICONS = { closed: "M18 8h-1V6a5 5 0 0 0-10 0v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zM9 6a3 3 0 0 1 6 0v2H9V6z",
+  open: "M18 8h-1V6a5 5 0 0 0-9.58-2l1.8.87A3 3 0 0 1 15 6v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2z" };
+let unlocked = false, playIdx = -1, audioUrl = "", rate = 1, seeking = false, resumeAt = null;
+function setUnlocked(on) {
+  unlocked = on; document.body.classList.toggle("unlocked", on);
+  if (!on) { stopRewind(); audio.pause(); playIdx = -1; document.querySelectorAll(".ln.now").forEach((x) => x.classList.remove("now")); }
+  syncAudio(); renderPlayer(); renderLines();  // 発言を押したときの働きが変わるので、案内も描き直す
+  if (on) status("解除しました。発言を押すとそこから聞けます。グレーにするには発言の右端のボタンを押します");
+}
+// 開いている回と、見ている版（元・雑音除去後）に合う録音を読む。版を替えても聞いている場所は保つ
+function syncAudio() {
+  const clean = showClean && cur && cur.has_clean_audio;
+  const url = unlocked && cur && cur.has_audio ? `/audio?t=${T}&id=${encodeURIComponent(cur.id)}&ver=${clean ? "clean" : "orig"}` : "";
+  if (url === audioUrl) return;
+  const sameMeeting = url && audioUrl && url.split("&ver=")[0] === audioUrl.split("&ver=")[0], wasPlaying = !audio.paused;
+  resumeAt = sameMeeting ? audio.currentTime : null;
+  audioUrl = url;
+  if (url) { audio.src = url; audio.load(); if (sameMeeting && wasPlaying) audio.play().catch(() => {}); }
+  else { audio.pause(); audio.removeAttribute("src"); audio.load(); }
+}
+function seekTo(t) { audio.currentTime = Math.max(0, Math.min(t, audio.duration || t)); renderTime(); }
+function renderTime() {
+  if (!unlocked) return;
+  const d = audio.duration || 0, t = audio.currentTime || 0;
+  if (!seeking) $("seek").value = d ? Math.round(t / d * 1000) : 0;
+  $("pTime").textContent = `${mmss(t * 1000)} / ${mmss(d * 1000)}`;
+  if (!recording) $("clock").textContent = mmss(t * 1000);
+  const list = showClean && cur ? cur.clean : cur ? cur.lines : [];
+  let idx = -1;
+  for (let i = 0; i < list.length && list[i].start_ms <= t * 1000 + 600; i++) idx = i;
+  if (idx !== playIdx) {
+    playIdx = idx;
+    document.querySelectorAll(".ln.now").forEach((x) => x.classList.remove("now"));
+    const el = document.querySelector(`#lines .ln[data-i="${idx}"]`);
+    if (el) { el.classList.add("now"); if (!audio.paused || rewRate) el.scrollIntoView({ block: "nearest" }); }
+  }
+}
+function renderPlayer() {
+  const has = !!(cur && cur.has_audio);
+  $("player").hidden = recording; $("meterBox").hidden = !recording;  // 記録中は聞けない（音がマイクに入るため）
+  $("seekRow").hidden = !(unlocked && has && !recording);
+  $("pLock").disabled = !has;
+  $("pLock").classList.toggle("open", unlocked);
+  $("pLock").title = !has ? "この回には録音がありません" : unlocked ? "押すと施錠します（再生も止まります）" : "押すと解除して、録音を聞けるようにします";
+  $("pLockIcon").setAttribute("d", unlocked ? LOCK_ICONS.open : LOCK_ICONS.closed);
+  document.querySelectorAll("#player [data-skip], #pPlay, #pFwd, #pRew").forEach((b) => { b.disabled = !(unlocked && has); });
+  $("pFwd").classList.toggle("open", rate !== 1 && !rewRate); $("pRew").classList.toggle("open", !!rewRate);
+  const playing = !audio.paused && !rewRate;
+  $("pPlayIcon").setAttribute("d", playing ? "M6 5h4v14H6zm8 0h4v14h-4z" : "M8 5v14l11-7z");
+  $("pPlay").title = playing ? "一時停止" : "再生";
+  if (!recording && !$("rec").disabled) {
+    // 始める前から、パソコンの音も拾う設定だと分かるようにする
+    const src = SOUND_LABEL[$("sound").value];
+    $("recSub").textContent = !unlocked ? (src ? `待機中 ・ ${src}` : "待機中") : rewRate ? `巻き戻し中 ・ ${rewRate}倍` : audio.paused ? "一時停止中" : rate === 1 ? "再生中" : `再生中 ・ ${rate}倍`;
+    if (!unlocked) $("clock").textContent = mmss(cur ? cur.recorded_ms : 0);
+  }
+  renderTime();
+}
+$("pLock").onclick = () => setUnlocked(!unlocked);
+const playAudio = () => audio.play().catch((e) => status("録音を再生できませんでした: " + e.message));
+function stopRewind() { rewRate = 0; if (rewTimer) { clearInterval(rewTimer); rewTimer = null; } }
+function rewStopForJump() { if (rewRate) { stopRewind(); setRate(1); } }  // 巻き戻しの途中で発言を押したら、そこから1倍で聞く
+function startRewind(v) {
+  rewRate = v; audio.pause();
+  if (!rewTimer) rewTimer = setInterval(() => {
+    const t = audio.currentTime - rewRate * REW_STEP_MS / 1000;
+    if (t <= 0) { stopRewind(); audio.currentTime = 0; setRate(1); return; }  // 先頭まで戻ったら止まって待つ
+    audio.currentTime = t; renderTime();
+  }, REW_STEP_MS);
+  renderPlayer();
+}
+$("pPlay").onclick = () => {
+  if (rewRate) { stopRewind(); setRate(1); playAudio(); return; }  // 巻き戻しの途中なら、その場所から通常の再生へ
+  if (audio.paused) playAudio(); else audio.pause();
+};
+$("pRew").onclick = () => {
+  const v = REW_RATES[(REW_RATES.indexOf(rewRate) + 1) % REW_RATES.length];
+  if (v) { startRewind(v); return; }
+  stopRewind(); setRate(1); playAudio();  // 一周したら1倍の再生に戻る
+};
+$("pFwd").onclick = () => {
+  if (rewRate) { stopRewind(); setRate(1); playAudio(); return; }
+  setRate(FWD_RATES[(FWD_RATES.indexOf(rate) + 1) % FWD_RATES.length]);
+  api("settings", { rate });
+  if (audio.paused) playAudio();
+};
+document.querySelectorAll("#player [data-skip]").forEach((b) => b.onclick = () => seekTo(audio.currentTime + Number(b.dataset.skip)));
+function setRate(v) { rate = FWD_RATES.includes(v) ? v : 1; audio.playbackRate = audio.defaultPlaybackRate = rate; renderPlayer(); }
+$("seek").oninput = () => { seeking = true; const d = audio.duration || 0; $("pTime").textContent = `${mmss($("seek").value / 1000 * d * 1000)} / ${mmss(d * 1000)}`; };
+$("seek").onchange = () => { seeking = false; seekTo($("seek").value / 1000 * (audio.duration || 0)); };
+audio.addEventListener("loadedmetadata", () => { audio.playbackRate = rate; if (resumeAt != null) { audio.currentTime = Math.min(resumeAt, audio.duration); resumeAt = null; } renderPlayer(); });
+["play", "pause", "ended"].forEach((k) => audio.addEventListener(k, renderPlayer));
+audio.addEventListener("timeupdate", renderTime);
+audio.addEventListener("seeked", renderTime);
+audio.addEventListener("error", () => { if (audioUrl) status("録音を読めませんでした"); });
+// 解除しているときだけ効く近道。Space で再生・一時停止、← → で5秒
+document.addEventListener("keydown", (e) => {
+  if (!unlocked || e.isComposing || e.ctrlKey || e.altKey || e.metaKey || /^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(e.target.tagName)) return;
+  if (e.code === "Space") { e.preventDefault(); $("pPlay").click(); }
+  else if (e.key === "ArrowLeft") seekTo(audio.currentTime - 5);
+  else if (e.key === "ArrowRight") seekTo(audio.currentTime + 5);
+});
+function fillSeries(st) {
+  $("series").innerHTML = `<option value="">（会議名なし）</option>` + st.series.map((s) => `<option value="${esc(s.path)}" title="${esc(s.path)}">${esc(s.name)}</option>`).join("");
+  $("series").value = st.series_cur || "";
+  renderPills();
+}
+// 会議名を切り替える／作る／登録すると、回の一覧をその会議名のものに入れ替える
+async function afterSeries(st) {
+  S = st; fillSeries(st); fillMeetings(st.meetings, st.meetings[0] ? st.meetings[0].id : "");
+  showMeeting(st.meetings[0] ? await api("open", { id: st.meetings[0].id }) : null);
+}
+$("series").onchange = async () => { if (recording) return; await afterSeries(await api("series", { path: $("series").value })); };
+$("seriesNew").onclick = async () => {
+  if (recording) return;
+  const name = prompt("会議名（例: 定例会、プロジェクト会議）。保存先の中に、この名前のフォルダを作ります");
+  if (name && name.trim()) await afterSeries(await api("series_new", { name }));
+};
+$("seriesAdd").onclick = async () => { if (recording) return; await afterSeries(await api("series_add")); };
+$("seriesOpen").onclick = () => api("open_folder", { which: "series" });
+$("shotsOpen").onclick = () => api("open_folder", { which: "shots" });
+$("shotBtn").onclick = async () => {
+  $("shotBtn").disabled = true;
+  const r = await api("shot");
+  $("shotBtn").disabled = false;
+  if (r && r.created) { await refreshList(r.id); showMeeting(await api("open", { id: r.id })); }  // 回を開いていなければ新しい回を作って保存する
+};
+function fillMeetings(list, selId) {
+  $("meetings").innerHTML = `<option value="">（回を選ぶ）</option>` + list.map((m) => `<option value="${esc(m.id)}">${esc(m.label)}</option>`).join("");
+  $("meetings").value = selId || "";
+}
+$("meetings").onchange = async () => { if (recording) return; const id = $("meetings").value; showMeeting(id ? await api("open", { id }) : null); if (!id) await api("clear"); };
+$("newBtn").onclick = async () => { if (recording) return; const p = await api("new"); await refreshList(p.id); showMeeting(p); };
+$("clearBtn").onclick = async () => { if (recording) { status("記録中はクリアできません。先に停止してください"); return; } await api("clear"); soundPending = null; $("meetings").value = ""; showMeeting(null); status("クリアしました。次に開始すると新しい会議になります（これまでの記録は一覧から開けます）"); };
+$("title").addEventListener("change", async () => { await api("title", { title: $("title").value }); if (cur) { cur.title = $("title").value; await refreshList(cur.id); } });
+async function refreshList(selId) { S = await api("state"); fillMeetings(S.meetings, selId); }
+
+// 記録
+function setRecording(on) {
+  recording = on;
+  if (on) setUnlocked(false);  // 流している音がマイクに入らないように止める
+  $("recIcon").innerHTML = on ? '<path d="M7 7h10v10H7z"/>' : '<circle cx="12" cy="12" r="7"/>';
+  $("rec").title = on ? "記録を停止" : "記録を開始";
+  $("recSub").textContent = on ? "記録中" : "待機中";
+  // 記録中はボタン・文字・音量の線を橙にして、記録していることが一目で分かるようにする
+  $("rec").classList.toggle("recording", on); $("recSub").classList.toggle("recording", on);
+  document.querySelector(".meter").classList.toggle("recording", on);
+  ["series", "seriesNew", "seriesAdd", "meetings", "newBtn", "clearBtn", "mic", "sound", "chooseData"].forEach((id) => $(id).disabled = on);
+  if (!on) $("mic").disabled = $("sound").value === "pc";
+  if (!on) $("meter").style.width = "0";
+  renderPlayer();
+}
+$("rec").onclick = () => {
+  if (recording) { api("stop"); $("rec").disabled = true; $("recSub").textContent = "停止しています…"; return; }
+  if (!$("mic").value && $("sound").value !== "pc") { status("マイクが見つかりません"); return; }
+  api("start", { mic: $("mic").value, diarize: $("diarize").checked });
+};
+const SOUND_LABEL = { mic: "", both: "マイク＋PC", pc: "PCの音" };
+const soundDefault = () => (S && S.settings.sound_default) || "mic";
+function applySound() {
+  const v = $("sound").value;
+  $("soundHelp").hidden = v === "mic"; $("mic").disabled = v === "pc" || recording;
+  $("soundDefault").hidden = v === soundDefault();
+  renderPlayer();
+}
+// 拾う音は回ごとに覚える。新しい回は既定の音から始まる
+let soundPending = null;
+function syncSound() { $("sound").value = (cur ? cur.sound : soundPending) || soundDefault(); applySound(); }
+$("sound").onchange = async () => {
+  const value = await api("sound", { value: $("sound").value });
+  if (cur) cur.sound = value; else soundPending = value;
+  syncSound();
+};
+$("soundDefault").onclick = () => {
+  S.settings.sound_default = $("sound").value;
+  api("settings", { sound_default: S.settings.sound_default });
+  applySound();
+  status("新しい回は、この音から始まります");
+};
+$("hideBtn").onclick = () => api("hide_window").then((r) => { if (!r) status("窓を隠せませんでした"); });
+$("limit").onchange = () => api("settings", { limit: $("limit").value });
+$("diarize").onchange = () => api("settings", { diarize: $("diarize").checked });
+$("mic").onchange = () => api("settings", { mic: $("mic").value });
+$("chooseData").onclick = async () => { const st = await api("choose_data"); S = st; $("dataDir").textContent = st.data_dir; $("dataDir").title = st.data_dir; fillSeries(st); fillMeetings(st.meetings, ""); showMeeting(null); };
+$("openData").onclick = () => api("open_folder", { which: "data" });
+
+// AI の窓を閉じる・開く。閉じているあいだも、ドラッグで決めた大きさは覚えている
+let chatClosed = false;
+function setChatClosed(v) {
+  chatClosed = v;
+  document.querySelector(".pane.chat").classList.toggle("closed", v);
+  $("split").hidden = v || !claudeOk;
+  $("chatToggleIcon").setAttribute("d", v ? "M5 16h14l-7-9z" : "M5 8h14l-7 9z");
+  $("chatToggle").title = v ? "開く" : "閉じる";
+  if (!v) $("chat").scrollTop = $("chat").scrollHeight;
+}
+$("chatToggle").onclick = () => { setChatClosed(!chatClosed); api("settings", { chat_closed: chatClosed }); };
+// 文字起こしと質問の境目をドラッグして大きさを変える。割合（文字起こしの高さの比）を覚えて次も使う
+function applySplit(ratio) {
+  if (!ratio) return;
+  document.querySelector(".pane.tr").style.flex = `${ratio} 1 0`;
+  document.querySelector(".pane.chat").style.flex = `${1 - ratio} 1 0`;
+}
+$("split").addEventListener("mousedown", (e) => {
+  e.preventDefault();
+  const panes = document.querySelector(".panes").getBoundingClientRect();
+  $("split").classList.add("drag"); document.body.classList.add("resizing");
+  let ratio = null;
+  const move = (ev) => {
+    ratio = Math.min(0.85, Math.max(0.15, (ev.clientY - panes.top) / panes.height));
+    applySplit(ratio);
+  };
+  const up = () => {
+    window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up);
+    $("split").classList.remove("drag"); document.body.classList.remove("resizing");
+    if (ratio) api("settings", { split: Math.round(ratio * 1000) / 1000 });
+  };
+  window.addEventListener("mousemove", move); window.addEventListener("mouseup", up);
+});
+$("split").addEventListener("dblclick", () => { applySplit(0.6); api("settings", { split: 0.6 }); });
+
+// 中身から流れてくる出来事
+const es = new EventSource(`/events?t=${T}`);
+const on = (k, f) => es.addEventListener(k, (e) => f(JSON.parse(e.data)));
+on("status", status);
+on("level", (v) => { $("meter").style.width = Math.min(100, v * 300) + "%"; });
+on("tick", (d) => {
+  $("clock").textContent = mmss(d.elapsed_ms);
+  const src = SOUND_LABEL[$("sound").value];  // 何を録っているかを見えるようにする
+  $("recSub").textContent = (d.left_s == null ? "記録中" : `記録中 ・ 残り ${mmss(d.left_s * 1000)}`) + (src ? ` ・ ${src}` : "");
+});
+on("started", async (p) => { setRecording(true); await refreshList(p.id); if (!cur || cur.id !== p.id) showMeeting(p); });
+// 発言の番号で、重複と抜けを見分ける。番号がずれたままだと、次のグレーが別の発言に当たってしまう
+on("line", (r) => {
+  if (!cur) return;
+  const { i, ...rec } = r;
+  if (i === cur.lines.length) { cur.lines.push(rec); renderLines(); }  // いつもの場合
+  else if (i > cur.lines.length) { reloadLines(); }  // 抜けた（接続が切れていたなど）
+  // i が小さいときは、補正やグレーの答えですでに受け取っている
+});
+on("stopped", (d) => { $("rec").disabled = false; if (cur) { cur.recorded_ms = d.recorded_ms; cur.has_audio = true; } setRecording(false); $("clock").textContent = mmss(d.recorded_ms); });
+on("answer", (d) => {
+  setAsking(false);
+  if (cur && cur.id === d.id) { cur.chats.push({ q: d.q, a: d.a }); renderChat(); }
+  if (d.cancelled && !$("q").value) { $("q").value = d.q; autoGrow(); }  // 止めた質問は、直して送り直せるように欄へ戻す
+  status(chatClosed ? "AI の答えが届きました（AI の窓の ▲ で開けます）" : "");
+});
+on("fixed", (d) => { if (cur && cur.id === d.id) { cur.lines = d.lines; renderLines(); } if (d.done) $("fixStop").hidden = true; status(d.msg); });
+on("docs", (d) => { if (cur && cur.id === d.id) { cur.docs = d.docs; renderDocs(); } });
+on("opened", async (p) => { await refreshList(p.id); showMeeting(p); });
+on("imported", async (p) => { importing = false; $("rec").disabled = false; await refreshList(p.id); if (!cur || cur.id === p.id) showMeeting(p); });
+
+// 音声ファイルを文字起こしの欄へドラッグすると、新しい回を作ってこのPCの中で文字にする（資料の添付は「＋」から）
+const AUDIO_RE = /\.(wav|mp3|m4a|aac|flac|ogg|opus|wma|mp4|mov|mkv|webm|avi)$/i;
+const trPane = document.querySelector(".pane.tr");
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", (e) => { e.preventDefault(); status("音声ファイルは「文字起こし」の欄へドラッグしてください。資料の添付は質問欄の「＋」からです"); });
+trPane.addEventListener("dragover", (e) => { e.preventDefault(); trPane.classList.add("dragover"); });
+trPane.addEventListener("dragleave", (e) => { if (!trPane.contains(e.relatedTarget)) trPane.classList.remove("dragover"); });
+trPane.addEventListener("drop", (e) => {
+  e.preventDefault(); e.stopPropagation(); trPane.classList.remove("dragover");
+  const f = e.dataTransfer.files[0]; if (f) importFile(f);
+});
+async function importFile(f) {
+  if (recording || importing) { status("記録中や文字起こしの最中は取り込めません"); return; }
+  if (!AUDIO_RE.test(f.name)) { status("音声か動画のファイルをドラッグしてください"); return; }
+  importing = true; $("rec").disabled = true; status("音声を取り込んでいます");
+  try {
+    const r = await fetch(`/api/import?t=${T}&name=${encodeURIComponent(f.name)}&diarize=${$("diarize").checked ? 1 : 0}`, { method: "POST", body: f });
+    const p = await r.json();
+    if (p) { await refreshList(p.id); showMeeting(p); return; }
+  } catch (err) { status("音声を送れませんでした: " + err); }
+  importing = false; $("rec").disabled = false; renderLines();
+}
+
+// 準備の確認。足りないものを上に出す（無いと記録できないものは橙で）。全部そろっていれば出さない
+function renderNotice(checks) {
+  const bad = (checks || []).filter((c) => !c.ok);
+  $("noticeList").innerHTML = bad.map((c) => `<li class="${c.need ? "need" : ""}"><span class="nm">${c.need ? "⚠ " : "ℹ "}${esc(c.name)}</span>：<span class="hp">${esc(c.help)}</span></li>`).join("");
+  $("notice").hidden = !bad.length;
+}
+$("noticeClose").onclick = () => { $("notice").hidden = true; };
+// AI を使わないとき（使わない設定、または準備が足りない）は、AI に関わる表示を一切出さない
+function applyClaude() {
+  const ai = S.ai;
+  claudeOk = ai.ready;
+  document.body.classList.toggle("noclaude", !claudeOk);
+  document.querySelector(".pane.chat").hidden = !claudeOk; $("split").hidden = !claudeOk || chatClosed;
+  // どこへ送るかが常に見えるようにする
+  $("aiName").textContent = ai.local ? `${ai.name}・${ai.model}・このパソコンの中` : ai.model ? `${ai.name}・${ai.model}` : ai.name;
+  // Web 検索とコネクタ（読むだけの道具）は Claude Code だけで使える
+  const tools = ai.provider === "claude_code";
+  $("webItem").hidden = $("connItem").hidden = !tools;
+  if (!tools && ($("web").checked || $("connectors").checked)) { $("web").checked = $("connectors").checked = false; renderPills(); }
+  const dOk = !!S.denoise_ok;
+  $("denoiseOn").disabled = !dOk;
+  $("denoiseHelp").textContent = dOk ? "" : "speech.cpp が古くて使えません。setup.bat をもう一度実行してください";
+  $("denoiseBtn").hidden = !(dOk && $("denoiseOn").checked);
+  const eg = S.engram && claudeOk;  // 要点を AI が作るので、AI を切ると engram へも送らない
+  $("engramOnLabel").hidden = $("engramOnSw").hidden = !eg;
+  $("engramBtn").hidden = !(eg && $("engramOn").checked);
+  renderLines();
+}
+$("denoiseOn").onchange = () => { api("settings", { denoise_on: $("denoiseOn").checked }); applyClaude(); };
+// AI の接続先。API キーは入れたらすぐ資格情報マネージャーへ送り、画面には残さない
+let aiModels = [], aiTesting = false, aiNote = "";
+// 試した結果やエラーは、次に設定を変えるまで残す（あとから届くモデルの一覧で消さない）
+function aiMsg(text) { aiNote = text; $("aiHelp").textContent = text; }
+function aiDefaultHelp(ai) {
+  if (ai.need) return ai.need;
+  if (ai.provider === "none") return "文字起こしだけを使います。何も外へ送りません";
+  if (ai.provider === "claude_code") return "質問したときの文字が、ご自分の Claude Code のアカウントへ送られます";
+  if (ai.local) return "文字もこのパソコンの中だけで扱います。画像の資料と Web 検索・コネクタは使えません";
+  return `質問したときの文字が ${ai.name} へ送られ、ご自分の API の料金がかかります。画像の資料と Web 検索・コネクタは使えません`;
+}
+function renderAi() {
+  const ai = S.ai, box = !["none", "claude_code"].includes(ai.provider);
+  $("aiProvider").innerHTML = ai.providers.map((p) => `<option value="${p.id}">${esc(p.label)}</option>`).join("");
+  $("aiProvider").value = ai.provider;
+  $("aiBox").hidden = !box;
+  $("aiUrlL").hidden = $("aiUrl").hidden = !ai.url_edit; $("aiUrl").value = ai.url;
+  $("aiKeyL").hidden = $("aiKeyRow").hidden = !ai.key;
+  $("aiKey").value = ""; $("aiKey").placeholder = ai.has_key ? "保存済み（ここには表示しません）" : "ここに貼り付け";
+  $("aiKeyDel").hidden = !ai.has_key;
+  const list = aiModels.includes(ai.model) || !ai.model ? aiModels : [ai.model, ...aiModels];
+  $("aiModel").hidden = !list.length; $("aiModelText").hidden = !!list.length;
+  $("aiModel").innerHTML = (ai.model ? "" : `<option value="">（モデルを選ぶ）</option>`) + list.map((m) => `<option>${esc(m)}</option>`).join("");
+  $("aiModel").value = ai.model; $("aiModelText").value = ai.model;
+  $("aiTest").disabled = !ai.ready || aiTesting;
+  $("aiHelp").textContent = aiNote || aiDefaultHelp(ai);
+}
+async function aiSet(body) {
+  aiNote = "";
+  // 接続先を毎回はっきり渡す（切り替えの直後でも、API キーを前の接続先に保存しないように）
+  const r = await api("ai_set", { provider: $("aiProvider").value, ...body });
+  if (!r) return;
+  S.ai = r; renderAi(); applyClaude();
+  if (r.error) aiMsg(r.error);
+  return r;
+}
+async function aiLoadModels() {
+  const p = S.ai.provider;
+  if (["none", "claude_code"].includes(p)) return;
+  const r = await api("ai_models", { provider: p });
+  if (S.ai.provider !== p) return;  // 待つあいだに接続先が替わった
+  aiModels = r.models || [];
+  // ローカル LLM に入っているモデルが1つだけなら、選ぶまでもない
+  if (!S.ai.model && aiModels.length === 1) return aiSet({ model: aiModels[0] });
+  renderAi();
+  if (r.error && !aiTesting) aiMsg(r.error);
+}
+$("aiProvider").onchange = async () => { aiModels = []; await aiSet({ provider: $("aiProvider").value }); aiLoadModels(); };
+$("aiUrl").onchange = async () => { const r = await aiSet({ url: $("aiUrl").value }); if (r && !r.error) aiLoadModels(); };
+$("aiKey").onchange = async () => { const key = $("aiKey").value; $("aiKey").value = ""; if (key.trim()) { await aiSet({ key }); aiLoadModels(); } };
+$("aiKeyDel").onclick = () => { aiModels = []; aiSet({ clear_key: true }); };
+$("aiModel").onchange = () => aiSet({ model: $("aiModel").value });
+$("aiModelText").onchange = () => aiSet({ model: $("aiModelText").value });
+$("aiTest").onclick = async () => {
+  aiTesting = true; $("aiTest").disabled = true; aiMsg("確かめています（ローカル LLM は初回に時間がかかります）");
+  const r = await api("ai_test");
+  aiTesting = false; $("aiTest").disabled = false;
+  aiMsg(r.ok ? `つながりました。答え: ${r.text}` : r.error);
+};
+$("engramOn").onchange = () => { api("settings", { engram_on: $("engramOn").checked }); applyClaude(); };
+
+// 起動
+(async () => {
+  S = await api("state");
+  renderNotice(S.checks);
+  const st = S.settings;
+  applyTheme(st.theme);
+  applySplit(st.split);
+  $("limit").innerHTML = S.limits.map((l) => `<option>${l}</option>`).join(""); $("limit").value = st.limit;
+  $("diarize").checked = st.diarize; $("past").checked = st.past; renderPills();
+  $("engramOn").checked = st.engram_on !== false; $("denoiseOn").checked = !!st.denoise_on;
+  renderAi(); aiLoadModels();
+  setRate(st.rate || 1); setAsking(!!S.asking); $("fixStop").hidden = !S.fixing; chatClosed = !!st.chat_closed;
+  setTimeout(() => setChatClosed(chatClosed));  // applyClaude のあとで整える
+  applyClaude();  // 過去の回を描く前に決める
+  $("mic").innerHTML = S.mics.map((m) => `<option value="${esc(m)}">${esc(m.startsWith("file:") ? "（試験用の音声ファイル）" : m)}</option>`).join("");
+  if (st.mic && S.mics.includes(st.mic)) $("mic").value = st.mic;
+  syncSound();
+  $("dataDir").textContent = S.data_dir; $("dataDir").title = S.data_dir;
+  fillSeries(S);
+  const first = S.current ? S.current.id : (S.meetings[0] ? S.meetings[0].id : "");
+  fillMeetings(S.meetings, first);
+  showMeeting(S.current || (first ? await api("open", { id: first }) : null));
+  setRecording(S.recording);
+  applyClaude();
+})();
+</script>
+</body>
+</html>
